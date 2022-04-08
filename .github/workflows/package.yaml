@@ -1,16 +1,21 @@
 name: Package ARM
 on:
   workflow_dispatch:
+    inputs:
+      pid:
+        description: 'Customer usage attribution ID in Azure Partner center'
+        required: true
+        default: 'pid-68a0b448-a573-4012-ab25-d5dc9842063e-partnercenter'
   # Allows you to run this workflow using GitHub APIs
   # PERSONAL_ACCESS_TOKEN=<GITHUB_PERSONAL_ACCESS_TOKEN>
   # REPO_NAME=WASdev/azure.liberty.aks
-  # curl --verbose -XPOST -u "WASdev:${PERSONAL_ACCESS_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" -H "Content-Type: application/json" https://api.github.com/repos/${REPO_NAME}/actions/workflows/package.yaml/dispatches --data '{"ref": "master"}'
+  # curl --verbose -XPOST -u "WASdev:${PERSONAL_ACCESS_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" -H "Content-Type: application/json" https://api.github.com/repos/${REPO_NAME}/actions/workflows/package.yaml/dispatches --data '{"ref": "master", "inputs":{"pid": "xxx"}}'
   repository_dispatch:
     types: [package]
   # sample request
   # PERSONAL_ACCESS_TOKEN=<GITHUB_PERSONAL_ACCESS_TOKEN>
   # REPO_NAME=WASdev/azure.liberty.aks
-  # curl --verbose -X POST https://api.github.com/repos/${REPO_NAME}/dispatches -H "Accept: application/vnd.github.everest-preview+json" -H "Authorization: token ${PERSONAL_ACCESS_TOKEN}" --data '{"event_type": "package"}'
+  # curl --verbose -X POST https://api.github.com/repos/${REPO_NAME}/dispatches -H "Accept: application/vnd.github.everest-preview+json" -H "Authorization: token ${PERSONAL_ACCESS_TOKEN}" --data '{"event_type": "package", "client_payload":{"pid": "xxx"}}'
 env:
   refArmttk: d97aa57d259e2fc8562e11501b1cf902265129d9
   refJavaee: 85d5d10dd045a90452ae01cad20b258ce853ec18
@@ -20,6 +25,20 @@ jobs:
   package:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup pid
+        id: setup-pid-based-on-dispatch-event
+        run: |
+          if [ ${{ github.event_name }} == 'workflow_dispatch' ]; then
+            pid=${{ github.event.inputs.pid }}
+          else
+            pid=${{ github.event.client_payload.pid }}
+            if [ -z "$pid" ]
+            then
+              pid=pid-68a0b448-a573-4012-ab25-d5dc9842063e-partnercenter
+            fi
+          fi
+          echo "##[set-output name=pid;]${pid}"
+          echo "pid=${pid}" >> $GITHUB_ENV
       - name: Checkout azure-javaee-iaas
         uses: actions/checkout@v2
         with:
@@ -47,7 +66,7 @@ jobs:
       - name: Build and test ${{ env.repoName }}
         run: |
           cd ${{ env.repoName }}
-          mvn -Ptemplate-validation-tests clean install
+          mvn -Ptemplate-validation-tests clean install -Dcustomer.usage.attribution.id=${{ env.pid }}
       - name: Generate artifact file name and path
         id: artifact_file
         run: |
